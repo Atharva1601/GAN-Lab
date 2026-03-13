@@ -1,9 +1,9 @@
+import os
 import streamlit as st
 import torch
 import torchvision.transforms as T
 import numpy as np
 from PIL import Image
-import matplotlib.pyplot as plt
 
 from model_architecture import (
     DCGenerator,
@@ -13,6 +13,9 @@ from model_architecture import (
     nz,
 )
 
+BASE_DIR = os.path.dirname(__file__)
+MODEL_DIR = os.path.join(BASE_DIR, "models")
+
 DEVICE = "cpu"
 
 st.set_page_config(page_title="GAN Portrait Demo", layout="wide")
@@ -20,15 +23,8 @@ st.set_page_config(page_title="GAN Portrait Demo", layout="wide")
 st.title("GAN Portrait Generator & Detector")
 st.write("Compare Vanilla GAN and DCGAN on portrait generation and detection.")
 
-# ====================================
-# MODEL SELECTOR
-# ====================================
 
 model_choice = st.selectbox("Select Model", ["Vanilla GAN", "DCGAN"])
-
-# ====================================
-# LOAD MODELS
-# ====================================
 
 
 @st.cache_resource
@@ -39,11 +35,16 @@ def load_models(model_choice):
         discriminator = VanillaDiscriminator()
 
         generator.load_state_dict(
-            torch.load("models/vanilla_generator.pth", map_location=DEVICE)
+            torch.load(
+                os.path.join(MODEL_DIR, "vanilla_generator.pth"), map_location=DEVICE
+            )
         )
 
         discriminator.load_state_dict(
-            torch.load("models/best_vanilla_discriminator.pth", map_location=DEVICE)
+            torch.load(
+                os.path.join(MODEL_DIR, "best_vanilla_discriminator.pth"),
+                map_location=DEVICE,
+            )
         )
 
     else:
@@ -51,11 +52,16 @@ def load_models(model_choice):
         discriminator = DCDiscriminator()
 
         generator.load_state_dict(
-            torch.load("models/dcgan_generator.pth", map_location=DEVICE)
+            torch.load(
+                os.path.join(MODEL_DIR, "dcgan_generator.pth"), map_location=DEVICE
+            )
         )
 
         discriminator.load_state_dict(
-            torch.load("models/best_dcgan_discriminator.pth", map_location=DEVICE)
+            torch.load(
+                os.path.join(MODEL_DIR, "best_dcgan_discriminator.pth"),
+                map_location=DEVICE,
+            )
         )
 
     generator.eval()
@@ -68,9 +74,6 @@ generator, discriminator = load_models(model_choice)
 
 st.divider()
 
-# ====================================
-# IMAGE GENERATION
-# ====================================
 
 st.header("Generate Fake Portraits")
 
@@ -88,8 +91,7 @@ if st.button("Generate Images"):
 
         fake_images = generator(noise)
 
-        # Convert [-1,1] -> [0,1]
-        fake_images = fake_images * 0.5 + 0.5
+        fake_images = (fake_images + 1) / 2
         fake_images = fake_images.cpu().numpy()
 
     cols = st.columns(4)
@@ -101,9 +103,6 @@ if st.button("Generate Images"):
 
 st.divider()
 
-# ====================================
-# REAL vs FAKE DETECTOR
-# ====================================
 
 st.header("Real vs Fake Detection")
 
@@ -123,7 +122,6 @@ if uploaded_file:
     with torch.no_grad():
         output = discriminator(img_tensor)
 
-        # DCGAN discriminator outputs logits
         confidence = torch.sigmoid(output).item()
 
     prediction = "Real" if confidence > 0.5 else "Fake"
